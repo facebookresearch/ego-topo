@@ -23,10 +23,12 @@ ln -s /vision/vision_users/tushar/datasets/EPIC_KITCHENS_2018/frames_rgb_flow/ d
 ln -s /vision/vision_users/tushar/datasets/EGTEA+/annotation/ data/gtea/
 ln -s /vision/vision_users/tushar/datasets/EGTEA+/frames/ data/gtea/
 ```
+
 -------
 
-Train a localization network (see `build_graph/localization_network/Readme.md`) to generate a model checkpoint:
+ Train a localization network (see `build_graph/localization_network/Readme.md`) to generate a model checkpoint:
 `build_graph/localization_network/cv/epic/ckpt_E_250_I_19250_L_0.368_A_0.834.pth`
+
 -------
 
 (Optional) Precompute localization network features for all frames in the dataset to speed up graph construction. Recommended.
