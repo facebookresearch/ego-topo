@@ -16,6 +16,7 @@ python -m retrieval_network.data.generate_r152_neighbors --dset epic
 ```
 Output dir: `build_graph/data/epic/`
 Files: `avg_feats_r152.pth`, `train_pdist_r152_samek.pth`, `train_pdist_r152_samek.pth`
+
 -------
 
 Generate superpoint descriptors for every clip
