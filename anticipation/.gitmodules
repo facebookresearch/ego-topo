@@ -1,0 +1,4 @@
+[submodule "mmaction"]
+	path = mmaction
+	url = git@github.com:lyttonhao/mmaction.git
+	branch = ego
