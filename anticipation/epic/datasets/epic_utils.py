@@ -145,10 +145,17 @@ def load_graphs(graph_root, videos):
 def get_graph(graph_history, frame_idx):
     frames, graphs = graph_history['frames'], graph_history['graphs']
 
-    keys = [x[1] for x in frames]
+    # keys = [x[1] for x in frames]
+    keys = [frames[graph['frame']][1] for graph in graphs]
     idx = bisect.bisect(keys, frame_idx) - 1
 
-    assert idx >= 0 and keys[idx] <= frame_idx and idx == graphs[idx]['frame'], "{} {} {}".format(idx, keys[idx], frame_idx)
+
+    if idx==-1:
+        print ('MINUS 1')
+        idx = 0
+    else:
+        # assert idx >= 0 and keys[idx] <= frame_idx and idx == graphs[idx]['frame'], "{} {} {}".format(idx, keys[idx], frame_idx)
+        assert keys[idx] <= frame_idx, "{} {} {}".format(idx, keys[idx], frame_idx)
 
     graph = graphs[idx]
 
@@ -170,3 +177,11 @@ def find_last_visit_node(graph):
             last = node
     
     return last
+
+
+def get_many_shot(fin):
+    with open(fin, "r") as f:
+        lines = f.readlines()[1:]
+        classes = [int(line.split(',')[0]) for line in lines]
+    
+    return classes

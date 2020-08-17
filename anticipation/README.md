@@ -1,14 +1,19 @@
-# Egocentric-Topological-Maps
+# Long-term Anticipation
 
-### Training
+### Preparation
+Prepare the data files for EPIC and GTEA under `data/epic/` and `data/gtea` folders, including:
 ```
-python -m epic.tools.train_recognizer epic/configs/baseline/fixfeature_S1_2mlp.py
+annotations: annotations files
+features: extracted clip-based features
+graphs: generated Ego-Topo graphs
+split: train/test split files
 ```
 
-### Generate LFB features
+### Training anticipation moodel
+Specify corresponding config files for training models:
 ```
-stride=30
-python -m epic.tools.generate_lfb  epic/configs/finetune/i3d_r50_S1_f32s2_kpretrain_fixbn.py \
-    data/epic/split/train_S1_nframes.csv data/epic/split/train_S1_verb.csv \
-    --lfb_output train_lfb_s${stride}.pkl --lfb_class_output train_lfb_class_s${stride}.pkl  --lfb_clip_stride ${stride}
+# I3D model
+python -m epic.tools.train_recognizer epic/configs/long_term_anti/epic/verb_anti_vpretrain/i3d.py
+# GFB_GCN model
+python -m epic.tools.train_recognizer epic/configs/long_term_anti/epic/verb_anti_vpretrain/gfb_gcn.py
 ```

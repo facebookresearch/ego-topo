@@ -2,6 +2,8 @@ import dgl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.models as tmodels
+from torch.nn.utils.rnn import pack_padded_sequence, pad_sequence, pad_packed_sequence, PackedSequence
 
 from mmcv.cnn import kaiming_init
 
@@ -20,8 +22,7 @@ class SimpleGfbModule(nn.Module):
         pass
 
     def forward(self, sfb, g):
-        # g = dgl.batch(g)
-        # g.to(sfb.device)
+        g.to(sfb.device)
         if self.pool_type == 'avg':
             g_feat = dgl.mean_nodes(g, 'feats')
         elif self.pool_type == 'max':
@@ -37,102 +38,162 @@ class SimpleGfbModule(nn.Module):
         nB, nC = g_feat.size()
         g_feat = g_feat.reshape((nB, nC, 1, 1, 1))
 
-        return torch.cat((sfb, g_feat), dim=1), None
-    
-    def loss(self, loss):
-        return {}
+        return torch.cat((sfb, g_feat), dim=1)
 
+import dgl
+import dgl.function as fn
+from dgl.nn.pytorch import GraphConv
+class GCN(nn.Module):
+    def __init__(self, in_dim, h_dim, num_layers):
+        super().__init__()
+        self.layers = nn.ModuleList([GraphConv(in_dim, h_dim, F.relu)])
+        for l in range(1, num_layers):
+            self.layers.append(GraphConv(h_dim, h_dim, F.relu))
 
+    def forward(self, inputs, g):
+        h = inputs
+        for layer in self.layers:
+            h = layer(h, g)
+        return h
+
+# GCN + MEAN
 @GFB_MODULES.register_module
-class WeightedGfbModule(nn.Module):
-    def __init__(self, in_channels=2048, node_channels=2048, h_channels=512, next_node_loss=False, loss_weight=1.0, att_act="softmax"):
-        super(WeightedGfbModule, self).__init__()
-
-        assert att_act in ["sigmoid", "softmax"]
-
-        self.next_node_loss = next_node_loss
-        self.loss_weight = loss_weight
-
-        self.trans_q = nn.Linear(in_channels, h_channels)
-        self.trans_v = nn.Linear(node_channels, h_channels)
-        self.weight_act = F.sigmoid if att_act == "sigmoid" else F.softmax
+class GCNGfbModule(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.gcn = GCN(2048, 2048, 2)
 
     def init_weights(self):
         pass
 
-    def transform_nodes(self, g, q):
-        feats = g.ndata['feats']
-        v = self.trans_v(feats)
+    def forward(self, sfb, bg):
+        bg.to(sfb.device)
 
-        w = torch.matmul(v, q.view(-1, 1)) / v.shape[1]
-        w_norm = self.weight_act(w)
+        feats, lengths = bg.ndata.pop('feats'), bg.ndata.pop('length')
+        feats = feats.sum(1)/lengths.unsqueeze(1).float()
+        bg.ndata['feats'] = feats
 
-        h = torch.matmul(w_norm.view(1, -1), feats)
-
-        # g.ndata['wfeats'] = h.view(-1)
-        # g.ndata["w"] = w 
-
-        return h.view(-1), w
-        # return {'wfeats' : h.view(-1), 'w': w}
-
-    def forward(self, sfb, g):
-        # g = dgl.batch(g)
-        # g.to(sfb.device)
-
-        nB, nC = sfb.size()[:2]
-        
-        q = self.trans_q(sfb.view(nB, nC))
-        # g.ndata["q"] = q
-        wfeats = []
-        loss = []
-        for idx, g_i in enumerate(dgl.unbatch(g)):
-            wfeats_i, w = self.transform_nodes(g_i, q[idx])
-            wfeats.append(wfeats_i)
-            if self.train and self.next_node_loss:
-                loss_i = self.node_loss(w, g_i.ndata["next_status"])
-                loss.append(loss_i)
-
-        wfeats = torch.stack(wfeats, 0)
-        if self.train and self.next_node_loss:
-            loss = torch.stack(loss, 0)
-        else:
-            loss = None
-        # g.apply_nodes(self.transform_nodes)
-
-        # wfeats = g.ndata.pop("wfeats")
+        feats = self.gcn(bg.ndata.pop('feats'), bg)
+        bg.ndata['feats'] = feats
+        g_feat = dgl.mean_nodes(bg, 'feats')
+      
         # (B, C) --> (B, C, 1, 1, 1)
- 
-        wfeats = wfeats.reshape((nB, -1, 1, 1, 1))
+        nB, nC = g_feat.size()
+        g_feat = g_feat.reshape((nB, nC, 1, 1, 1))
 
-        return torch.cat((sfb, wfeats), dim=1), loss
+        return torch.cat((sfb, g_feat), dim=1)
 
 
-    def node_loss(self, w, next_status):
-        # pred = nodes.data['w'].view(1, -1)
-        # label = torch.argmax(nodes.data["next_status"]).view(1)
-        # loss = F.cross_entropy(pred, label)
+# # MEAN FEATS
+# @GFB_MODULES.register_module
+# class GraphX(nn.Module):
+#     def __init__(self,**kwargs):
+#         super().__init__()
 
-        # return {"loss": loss}
-        pred = w.view(1, -1)
-        label = torch.argmax(next_status).view(1)
-        loss = F.cross_entropy(pred, label)
+#     def init_weights(self):
+#         pass
 
-        return loss
+#     def forward(self, sfb, bg):
+#         bg.to(sfb.device)
+       
+#         feats, lengths = bg.ndata.pop('feats'), bg.ndata.pop('length')
 
-    def loss(self, loss):
-        if not self.next_node_loss:
-            return {}
-        
-        # next_node_loss = []
-        # for idx, g_i in enumerate(dgl.unbatch(g)):
-        #     pred = g_i.ndata.pop('w').view(1, -1) # (n, 1)
-        #     label = troch.argmax(g_i.ndata.pop("next_status")).view(1)
-            
-        #     gloss = F.cross_entropy(pred, label)
-        #     nexxt_node_loss.append(gloss)
-        
-        # next_node_loss = torch.stack(next_node_loss, 0)
-        # g.apply_nodes(self.nodes_loss)
-        # next_node_loss = g.ndata["loss"]
+#         feats = feats.sum(1)/lengths.unsqueeze(1).float()
+#         bg.ndata['feats'] = feats
+#         g_feat = dgl.mean_nodes(bg, 'feats')
 
-        return {"next_node_cls_loss": self.loss_weight * loss}
+
+#         # (B, C) --> (B, C, 1, 1, 1)
+#         nB, nC = g_feat.size()
+#         g_feat = g_feat.reshape((nB, nC, 1, 1, 1))
+
+#         return torch.cat((sfb, g_feat), dim=1)
+
+
+@GFB_MODULES.register_module
+class GraphX(nn.Module):
+    def __init__(self,**kwargs):
+        super().__init__()
+        self.rnn = nn.LSTM(2048, 2048, num_layers=2, batch_first=True)
+        # self.gcn = GCN(2048, 2048, 1)
+
+        # self.feat = nn.Sequential(
+        #         nn.Linear(2048, 2048),
+        #         nn.ReLU(True),
+        #         nn.Linear(2048, 2048),
+        #         nn.ReLU(True))
+
+        # rnet = tmodels.resnet50(pretrained=True)
+        # rnet.fc = self.feat
+        # self.feat = rnet
+
+
+    def init_weights(self):
+        wts = torch.load('work_dir/pretrain/epoch_50.pth')['state_dict']
+        wts = {k.replace('backbone.lstm.',''):v for k,v in wts.items() if 'lstm' in k}
+        self.rnn.load_state_dict(wts)
+        print ('loaded pretrained LSTM weights')
+
+        # # wts = torch.load('data/affordance/best_model_r50.pth')['model']
+        # wts = torch.load('data/affordance/best_model.pth')['model']
+        # wts = {k.replace('feat.',''):v for k,v in wts.items() if 'feat' in k}
+        # self.feat.load_state_dict(wts)
+        # print ('loaded pretrained affordance model weights')
+
+
+    def named_modules(self, memo=None, prefix=''):
+        if memo is None:
+            memo = set()
+        if self not in memo:
+            memo.add(self)
+            yield prefix, self
+            for name, module in self._modules.items():
+                if name=='rnn' or name=='feat':
+                    continue
+                if module is None:
+                    continue
+                submodule_prefix = prefix + ('.' if prefix else '') + name
+                for m in module.named_modules(memo, submodule_prefix):
+                    yield m
+
+    def forward(self, sfb, bg):
+        bg.to(sfb.device)
+       
+        # # Average all node features first
+        # feats, lengths = bg.ndata.pop('feats'), bg.ndata.pop('length')
+        # feats = feats.sum(1)/lengths.unsqueeze(1).float()
+        # bg.ndata['feats'] = feats
+
+        # # Affordance Model
+        # feats = bg.ndata.pop('feats')
+        # feats = self.feat(feats)
+        # bg.ndata['feats'] = feats
+
+        # # First affordance, then avg output features
+        # feats, lengths = bg.ndata.pop('feats'), bg.ndata.pop('length')
+        # feats = pack_padded_sequence(feats, lengths, batch_first=True, enforce_sorted=False)
+        # feats = PackedSequence(self.feat(feats.data), feats.batch_sizes, feats.sorted_indices, feats.unsorted_indices)
+        # feats = pad_packed_sequence(feats, batch_first=True)[0]
+        # feats = feats.sum(1)/lengths.unsqueeze(1).float()
+        # bg.ndata['feats'] = feats
+
+        # LSTM
+        feats, lengths = bg.ndata.pop('feats'), bg.ndata.pop('length')
+        packed_feats = pack_padded_sequence(feats, lengths, batch_first=True, enforce_sorted=False)
+        packed_output = self.rnn(packed_feats)
+        seq, (ht, ct) = packed_output
+        bg.ndata['feats'] = ht[-1]
+
+        # # GCN
+        # feats = bg.ndata.pop('feats')
+        # feats = self.gcn(feats, bg)
+        # bg.ndata['feats'] = feats
+
+        # MEAN
+        g_feat = dgl.mean_nodes(bg, 'feats')
+
+        # (B, C) --> (B, C, 1, 1, 1)
+        nB, nC = g_feat.size()
+        g_feat = g_feat.reshape((nB, nC, 1, 1, 1))
+
+        return torch.cat((sfb, g_feat), dim=1)

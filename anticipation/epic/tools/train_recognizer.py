@@ -98,14 +98,14 @@ def main():
         validate=args.validate,
         logger=logger)
     
-    from epic.tools.test_recognizer import do_test
-    checkpoint = os.path.join(cfg.work_dir, "latest.pth")
-    print("Testing on {}.".format(args.config))
-    print("Checkpoint {}.".format(checkpoint))
-    output_file = None
-    if "output_file" in cfg:
-        output_file = cfg.output_file
-    do_test(cfg, output_file, checkpoint, 1)
+    # from epic.tools.test_recognizer import do_test
+    # checkpoint = os.path.join(cfg.work_dir, "latest.pth")
+    # print("Testing on {}.".format(args.config))
+    # print("Checkpoint {}.".format(checkpoint))
+    # output_file = None
+    # if "output_file" in cfg:
+    #     output_file = cfg.output_file
+    # do_test(cfg, output_file, checkpoint, 1)
 
 
 if __name__ == '__main__':
