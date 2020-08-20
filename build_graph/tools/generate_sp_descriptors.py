@@ -5,8 +5,7 @@ import cv2
 import torch
 import tqdm
 
-import data
-from data import epic, gtea
+from ..data import epic, gtea
 from .superpoint.model import SuperPointFrontend
 
 
@@ -35,9 +34,9 @@ def run():
     os.makedirs(descriptor_dir, exist_ok=True)
 
     if args.dset=='epic':
-        dset = epic.EPICInteractions('data/epic', 'val', 32)
+        dset = epic.EPICInteractions('build_graph/data/epic', 'val', 32)
     elif args.dset=='gtea':
-        dset = gtea.GTEAInteractions('data/gtea', 'val', 32)
+        dset = gtea.GTEAInteractions('build_graph/data/gtea', 'val', 32)
 
     # Gather 16 uniformly spaced frames from each clip to genereate descriptors for
     entries = dset.train_data + dset.val_data

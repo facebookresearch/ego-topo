@@ -15,7 +15,7 @@ import torchnet as tnt
 import collections
 from torch.utils.tensorboard import SummaryWriter
 
-from utils import util
+from ..utils import util
 from .dataset import EPICPairs, GTEAPairs
 from .model import SiameseR18_5MLP
 
@@ -140,13 +140,11 @@ def run():
 
     if args.dset=='epic':
         Dset = EPICPairs
-        root = 'data/epic'
     elif args.dset=='gtea':
         Dset = GTEAPairs
-        root = 'data/gtea'
 
-    trainset = Dset(root, 'train')
-    valset = Dset(root, 'val')
+    trainset = Dset(f'build_graph/data/{args.dset}', 'train')
+    valset = Dset(f'build_graph/data/{args.dset}', 'val')
 
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
     valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)

@@ -8,8 +8,8 @@ import h5py
 import tqdm
 import itertools
 
-from data import epic, gtea
-from utils import util
+from ..data import epic, gtea
+from ..utils import util
 
 #-------------------------------------------------------------------------------------------#
 
@@ -282,8 +282,8 @@ class GTEAPairs(RetrievalBase):
 if __name__=='__main__':
     from torchvision.utils import make_grid
 
-    dataset = EPICPairs('data/epic', 'train')
-    # dataset = GTEAPairs('data/gtea', 'train')
+    dataset = EPICPairs('build_graph/data/epic', 'train')
+    # dataset = GTEAPairs('build_graph/data/gtea', 'train')
 
     viz = []
     for idx, entry in enumerate(dataset.data):

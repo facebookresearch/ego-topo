@@ -1,10 +1,8 @@
 import numpy as np
 import collections
 import torch
-from data import epic
 import os
 import glob
-from utils import util
 from PIL import Image, ImageOps
 import h5py
 import tqdm
@@ -12,8 +10,7 @@ import itertools
 from scipy.sparse import csr_matrix
 import re
 
-import data
-from data import epic, gtea
+from ..data import epic, gtea
 
 
 import argparse
@@ -71,9 +68,9 @@ def generate_nbhs(homography_file):
 def generate_pairwise_inliers():
 
     if args.dset=='gtea':
-        dset = gtea.GTEAInteractions('data/gtea', 'val', 32)
+        dset = gtea.GTEAInteractions('build_graph/data/gtea', 'val', 32)
     elif args.dset=='epic':
-        dset = epic.EPICInteractions('data/epic', 'val', 32)
+        dset = epic.EPICInteractions('build_graph/data/epic', 'val', 32)
 
     neighbors = collections.defaultdict(list)
     for homography_file in glob.glob(f'build_graph/data/{args.dset}/matches/*/*.pth'):

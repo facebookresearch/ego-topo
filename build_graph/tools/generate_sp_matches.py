@@ -5,7 +5,6 @@ import os
 import time
 import cv2
 import torch
-
 import tqdm
 import itertools
 import collections
@@ -17,10 +16,9 @@ from random import shuffle
 import functools
 from joblib import Parallel, delayed
 
-from utils import util
-from data import epic, gtea
+from ..utils import util
+from ..data import epic, gtea
 
-import argparse
 parser = argparse.ArgumentParser(description='PyTorch SuperPoint Demo.')
 parser.add_argument('--chunk', default=None)
 parser.add_argument('--split', default=None)
@@ -137,7 +135,7 @@ def ransac(corr, thresh):
 
 def get_descriptor(uid):
     # we have 16 of them per video clip, but just pick the middle one
-    descriptors = torch.load(f'build_graph/data/{args.dset}/descriptors/{uid}.pth')['desc']
+    descriptors = torch.load(f'build_graph/data/{args.dset}/descriptors/{uid}')['desc']
     desc = descriptors[len(descriptors)//2] 
     return (desc['desc'], desc['pts'])
 
@@ -193,7 +191,7 @@ def run():
     if args.dset=='epic':
         # args.chunk should be the person ID (P01, P02 ...)
         # P22 is split into P22a + P22b because it has too many clips
-        dset = epic.EPICInteractions('data/epic', args.split, 32)
+        dset = epic.EPICInteractions('build_graph/data/epic', args.split, 32)
         entries = [entry for entry in dset.data if args.chunk[0:3] in entry['uid']]
 
         uid_to_entry = {entry['uid']:entry for entry in entries}
@@ -209,7 +207,7 @@ def run():
 
     elif args.dset=='gtea':
         # args.chunk should be one of [train1, train2, train3, train4, val]
-        dset = gtea.GTEAInteractions('data/gtea', args.split, 32)
+        dset = gtea.GTEAInteractions('build_graph/data/gtea', args.split, 32)
         entries =  dset.data # all of them are in the same kitchen!
 
         uid_to_entry = {entry['uid']:entry for entry in entries}

@@ -123,15 +123,3 @@ def add_border(img, color, sz=128):
     img = transforms.ToTensor()(img)
     return img
 
-def load_epic_frame(frame):
-    import data
-    v_id, f_id = frame
-    fl = '%s/frames_rgb_flow/rgb/train/%s/%s/frame_%010d.jpg'%(data._DATA_ROOTS['epic'], v_id.split('_')[0], v_id, f_id)
-    return Image.open(fl).convert('RGB')
-
-def load_gtea_frame(frame):
-    import data
-    v_id, f_id = frame
-    fl = '%s/frames/%s/frame_%010d.jpg'%(data._DATA_ROOTS['gtea'], v_id, f_id)
-    return Image.open(fl).convert('RGB')
-

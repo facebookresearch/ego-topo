@@ -10,9 +10,9 @@ import argparse
 import shutil
 import torch.nn as nn
 
-from data import epic, gtea
+from ..data import epic, gtea
 from ..localization_network.model import SiameseR18_5MLP
-from utils import util
+from ..utils import util
 
 # subsampled frames @6fps for graph construction
 class FrameDsetSubsampled:
@@ -20,9 +20,9 @@ class FrameDsetSubsampled:
     def __init__(self, dset):
 
         if dset=='gtea':
-            self.dset = gtea.GTEAInteractions('data/gtea', 'val', 32)
+            self.dset = gtea.GTEAInteractions('build_graph/data/gtea', 'val', 32)
         elif dset=='epic':
-            self.dset = epic.EPICInteractions('data/epic', 'val', 32)
+            self.dset = epic.EPICInteractions('build_graph/data/epic', 'val', 32)
 
         # subsample frames to 6fps for graph generation
         subsample =  self.dset.fps//6

@@ -1,10 +1,8 @@
 import numpy as np
 import collections
 import torch
-from data import epic
 import os
 import glob
-from utils import util
 from PIL import Image, ImageOps
 import h5py
 import tqdm
@@ -15,14 +13,10 @@ import re
 from torchvision import models as tmodels
 import torch
 import torch.nn as nn
-
-import data
-from data import epic, gtea
-
 import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument('--dset', default=None)
-args = parser.parse_args()
+
+from ..utils import util
+from ..data import epic, gtea
 
 class ClipFeats:
 
@@ -55,7 +49,7 @@ def featurize(frames, net, bs=512):
 # for each interaction clip, calculate average r152 features
 # returns: {uid: 2048D feature}
 # On 4 K40s: GTEA (~1 hr) | EPIC (~3 hr)
-def generate_avg_interaction_features():
+def generate_avg_interaction_features(args):
 
     net = tmodels.resnet152(pretrained=True)
     net.fc = nn.Identity()
@@ -63,9 +57,9 @@ def generate_avg_interaction_features():
     net.cuda().eval()
 
     if args.dset=='epic':
-        dset = epic.EPICInteractions('data/epic', 'val', 32)
+        dset = epic.EPICInteractions('build_graph/data/epic', 'val', 32)
     elif args.dset=='gtea':
-        dset = gtea.GTEAInteractions('data/gtea', 'val', 32)
+        dset = gtea.GTEAInteractions('build_graph/data/gtea', 'val', 32)
     dset = ClipFeats(dset)
     loader = torch.utils.data.DataLoader(dset, batch_size=1, shuffle=False, num_workers=8)
 
@@ -79,14 +73,14 @@ def generate_avg_interaction_features():
 # generate pairwise distance matrix between every clip in the dataset
 # distance = feature similarity of average resnet152 features computed in generate_avg_interaction_features()
 # restrict to only clips from the same kitchen (EPIC) to save time (< 2 mins to run)
-def generate_pairwise_clip_distance():
+def generate_pairwise_clip_distance(args):
     if args.dset=='epic':
-        generate_pairwise_clip_distance_epic()
+        generate_pairwise_clip_distance_epic(args)
     elif args.dset=='gtea':
-        generate_pairwise_clip_distance_gtea()
+        generate_pairwise_clip_distance_gtea(args)
 
 
-def generate_pairwise_clip_distance_epic():
+def generate_pairwise_clip_distance_epic(args):
 
     def generate_pdist_matrices(videos, split):
 
@@ -118,11 +112,11 @@ def generate_pairwise_clip_distance_epic():
     all_avg_feats = torch.load(f'build_graph/data/{args.dset}/avg_feats_r152.pth')
     all_uids = sorted(all_avg_feats.keys())
     
-    dset = epic.EPICInteractions('data/epic', 'val', 32)
+    dset = epic.EPICInteractions('build_graph/data/epic', 'val', 32)
     generate_pdist_matrices(dset.train_vids, 'train')
     generate_pdist_matrices(dset.val_vids, 'val')
 
-def generate_pairwise_clip_distance_gtea():
+def generate_pairwise_clip_distance_gtea(args):
 
     def generate_pdist_matrices(data, split):
 
@@ -140,14 +134,19 @@ def generate_pairwise_clip_distance_gtea():
 
     all_avg_feats = torch.load(f'build_graph/data/{args.dset}/avg_feats_r152.pth')
 
-    dset = gtea.GTEAInteractions('data/gtea', 'val', 32)
+    dset = gtea.GTEAInteractions('build_graph/data/gtea', 'val', 32)
     generate_pdist_matrices(dset.train_data, 'train')
     generate_pdist_matrices(dset.val_data, 'val')
 
 
 #-------------------------------------------------------------------------------------------------------------------#
 if __name__=='__main__':
-    generate_avg_interaction_features()
-    generate_pairwise_clip_distance()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dset', default=None)
+    args = parser.parse_args()
+
+    generate_avg_interaction_features(args)
+    generate_pairwise_clip_distance(args)
 
 

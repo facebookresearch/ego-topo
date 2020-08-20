@@ -3,10 +3,14 @@ import torch.nn as nn
 import os
 import itertools 
 import tqdm
-from utils import util
 import numpy as np
-
 import argparse
+
+from ..utils import util
+from ..data import gtea, epic
+from ..localization_network.model import R18_5MLP
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--dset', default=None)
 parser.add_argument('--load', default=None)
@@ -15,18 +19,15 @@ parser.add_argument('--cv_dir', default=None)
 parser.add_argument('--parallel', action ='store_true', default=False)
 args = parser.parse_args()
 
-from utils import util
-from data import gtea, epic
-from ..localization_network.model import R18_5MLP
 
 class PairwiseFrames:
 
     def __init__(self, dset, v_id, feat_source):
         
         if dset=='epic':
-            dataset = epic.EPICInteractions('data/epic', 'val', 32)
+            dataset = epic.EPICInteractions('build_graph/data/epic', 'val', 32)
         elif dset=='gtea':
-            dataset = gtea.GTEAInteractions('data/gtea', 'val', 32)
+            dataset = gtea.GTEAInteractions('build_graph/data/gtea', 'val', 32)
             
         frames = [(v_id, f_id) for f_id in range(1, dataset.annotations['vid_lengths'][v_id] + 1, dataset.fps//6)]
         self.data = list(itertools.combinations(frames, 2))

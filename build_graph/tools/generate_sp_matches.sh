@@ -10,7 +10,7 @@ fi
 
 for chunk in "${chunks[@]}"; do
 	if [ ! -f "$match_dir/$chunk.pth" ]; then
-		echo python -m build_graph.tools.generate_sp_matches --dset $dset --split $split --chunk $chunk --cv_dir cv/tmp/superpoint/matches/$split/$chunk 
+		python -m build_graph.tools.generate_sp_matches --dset $dset --split $split --chunk $chunk --cv_dir build_dir/cv/tmp/superpoint/matches/$split/$chunk 
 	fi
 done
 

@@ -6,7 +6,6 @@ import time
 import cv2
 import torch
 import colorsys
-
 import tqdm
 import itertools
 import collections
@@ -16,8 +15,8 @@ from PIL import Image
 import random
 from random import shuffle
 
-from utils import util
-from data import epic, gtea
+from ..utils import util
+from ..data import epic, gtea
 
 
 import argparse
@@ -27,7 +26,7 @@ args = parser.parse_args()
 
 def get_descriptor(uid):
     # we have 16 of them per video clip, but just pick the middle one
-    descriptor_data = torch.load(f'build_graph/data/{args.dset}/descriptors/{uid}.pth')
+    descriptor_data = torch.load(f'build_graph/data/{args.dset}/descriptors/{uid}')
     descriptors = descriptor_data['desc']
     desc = descriptors[len(descriptors)//2] 
     frame = descriptor_data['frames'][len(descriptor_data['frames'])//2]
@@ -86,10 +85,11 @@ def drawMatches(img1, kp1, img2, kp2, matches, inliers = None):
 
 if __name__=='__main__':
 
+    
     split = 'train'
     kitchen = 'P01'
 
-    dset = epic.EPICInteractions('data/epic', split, 32)
+    dset = epic.EPICInteractions('build_graph/data/epic', split, 32)
     uid_to_entry = {entry['uid']:entry for entry in dset.data}
 
     neighbors = torch.load(f'build_graph/data/{args.dset}/matches/{split}/{kitchen}.pth')

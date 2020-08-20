@@ -16,19 +16,19 @@ import torchvision.models as tmodels
 import copy
 import json
 
-from utils import util
+from ..utils import util
 
 #-------------------------------------------------------------------------------------------------------------------#
 
 def parse_annotations(data_dir):
 
-    with open(f'{data_dir}/annotation/verb_idx.txt') as f:
+    with open(f'{data_dir}/annotations/verb_idx.txt') as f:
         verbs = f.read().strip().split('\n')
         verbs = ['-'.join(line.split(' ')[:-1]).lower() for line in verbs]
-    with open(f'{data_dir}/annotation/noun_idx.txt') as f:
+    with open(f'{data_dir}/annotations/noun_idx.txt') as f:
         nouns = f.read().strip().split('\n')
         nouns = [line.split(' ')[0].lower() for line in nouns]
-    with open(f'{data_dir}/annotation/action_idx.txt') as f:
+    with open(f'{data_dir}/annotations/action_idx.txt') as f:
         lines = f.read().strip().split('\n')
         actions = []
         for line in lines:
@@ -59,8 +59,8 @@ def parse_annotations(data_dir):
 
         return entries
 
-    lines = open(f'{data_dir}/annotation/train_split1.txt').read().strip().split('\n')
-    lines += open(f'{data_dir}/annotation/test_split1.txt').read().strip().split('\n')
+    lines = open(f'{data_dir}/annotations/train_split1.txt').read().strip().split('\n')
+    lines += open(f'{data_dir}/annotations/test_split1.txt').read().strip().split('\n')
     interactions = parse_interaction_annotatons(lines)
     annotations['interactions'] = interactions
 
@@ -77,7 +77,7 @@ def parse_annotations(data_dir):
         video_lengths[entry['v_id']] = max(video_lengths[entry['v_id']], entry['stop'])
     annotations['vid_lengths'] = video_lengths
 
-    torch.save(annotations, 'data/gtea/gtea_data.pth')
+    torch.save(annotations, 'build_graph/data/gtea/gtea_data.pth')
 
 #-------------------------------------------------------------------------------------------------------------------#
 
@@ -89,11 +89,11 @@ class GTEA(torch.utils.data.Dataset):
         self.root = root
         self.fps = 24
 
-        if not os.path.exists('data/gtea/gtea_data.pth'):
+        if not os.path.exists('build_graph/data/gtea/gtea_data.pth'):
             parse_annotations(self.root)
             print ('Annotations created!')
 
-        self.annotations =  torch.load('data/gtea/gtea_data.pth')
+        self.annotations =  torch.load('build_graph/data/gtea/gtea_data.pth')
         self.interactions = self.annotations['interactions']
         self.verbs, self.nouns = self.annotations['verbs'], self.annotations['nouns']
         self.train_vids, self.val_vids = self.annotations['train_vids'], self.annotations['val_vids']
@@ -122,7 +122,7 @@ class GTEAInteractions(GTEA):
         self.data = self.train_data if self.split=='train' else self.val_data
         print (f'Train data: {len(self.train_data)} | Val data: {len(self.val_data)}')
         
-        self.clip_transform = util.clip_transform(self.split, self.clip_len)    
+        # self.clip_transform = util.clip_transform(self.split, self.clip_len)    
 
     def parse_data_for_split(self, videos):
         videos = set(videos)

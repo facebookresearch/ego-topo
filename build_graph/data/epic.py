@@ -15,7 +15,7 @@ import re
 import torchvision.models as tmodels
 import copy
 
-from utils import util
+from ..utils import util
 
 #-------------------------------------------------------------------------------------------------------------------#
 
@@ -65,7 +65,7 @@ def parse_annotations(data_dir):
         video_lengths[entry['v_id']] = max(video_lengths[entry['v_id']], entry['stop'])
     annotations['vid_lengths'] = video_lengths
 
-    torch.save(annotations, 'data/epic/epic_data.pth')
+    torch.save(annotations, 'build_graph/data/epic/epic_data.pth')
 
 #-------------------------------------------------------------------------------------------------------------------#
 
@@ -76,11 +76,11 @@ class EPIC(torch.utils.data.Dataset):
         self.root = root
         self.fps = 60
         
-        if not os.path.exists('data/epic/epic_data.pth'):
+        if not os.path.exists('build_graph/data/epic/epic_data.pth'):
             parse_annotations(self.root)
             print ('Annotations created!')
 
-        self.annotations =  torch.load('data/epic/epic_data.pth')
+        self.annotations =  torch.load('build_graph/data/epic/epic_data.pth')
         self.interactions = self.annotations['interactions']
         self.verbs, self.nouns = self.annotations['verbs'], self.annotations['nouns']
         self.train_vids, self.val_vids = self.annotations['train_vids'], self.annotations['val_vids']
@@ -88,7 +88,8 @@ class EPIC(torch.utils.data.Dataset):
     def frame_path(self, img):
         v_id, f_id = img
         p_id = v_id.split('_')[0]
-        file = f'{self.root}/frames_rgb_flow/rgb/train/{p_id}/{v_id}/frame_{f_id:010d}.jpg'
+        # file = f'{self.root}/frames/train/{p_id}/{v_id}/frame_{f_id:010d}.jpg' # orig
+        file = f'{self.root}/frames/train/{v_id}/frame_{f_id:010d}.jpg' # devfair
         return file        
 
     def load_image(self, img):
@@ -112,7 +113,7 @@ class EPICInteractions(EPIC):
         self.data = self.train_data if self.split=='train' else self.val_data
         print (f'Train data: {len(self.train_data)} | Val data: {len(self.val_data)}')
         
-        self.clip_transform = util.clip_transform(self.split, self.clip_len)    
+        # self.clip_transform = util.clip_transform(self.split, self.clip_len)    
 
     def parse_data_for_split(self, videos):
         videos = set(videos)
