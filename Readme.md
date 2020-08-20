@@ -2,7 +2,7 @@
 
 ![Teaser](http://vision.cs.utexas.edu/projects/ego-topo/media/concept.png)
 
-This code implements a model to parse untrimmed egocentric video into a topological graph of activity zones in the underlying environment, and associates actions that occur in the video to nodes in this graph. The topological graph serves as a structured representation of the video and can be used to discover environment affordances and help anticipate future actions in long form video. See the demo [here]!(http://vision.cs.utexas.edu/projects/ego-topo/demo.html)
+This code implements a model to parse untrimmed egocentric video into a topological graph of activity zones in the underlying environment, and associates actions that occur in the video to nodes in this graph. The topological graph serves as a structured representation of the video and can be used to discover environment affordances and help anticipate future actions in long form video. See the demo [here](http://vision.cs.utexas.edu/projects/ego-topo/demo.html)!
 
 This is the code accompanying our CVPR20 (oral) work:  
 Tushar Nagarajan, Yanghao Li, Christoph Feichtenhofer and Kristen Grauman.  
