@@ -22,7 +22,7 @@ from mmcv.parallel import DataContainer as DC
 from functools import lru_cache
 
 from .epic_utils import EpicRawFramesRecord, to_tensor
-import epic.datasets.epic_utils as epic_utils
+import anticipation.datasets.epic_utils as epic_utils
 from .epic_future_labels import EpicFutureLabelsGFB1, EpicFutureLabelsGFB
 
 

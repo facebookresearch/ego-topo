@@ -17,7 +17,7 @@ from mmaction.apis.env import get_root_logger
 
 from .. import datasets
 from ..models import *
-import epic.utils as utils
+import anticipation.utils as utils
 
 
 def parse_args():

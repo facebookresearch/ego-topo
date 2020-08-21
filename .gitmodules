@@ -1,4 +1,4 @@
 [submodule "anticipation/mmaction"]
 	path = anticipation/mmaction
 	url = git@github.com:lyttonhao/mmaction.git
-	branch = ego
+	branch = ego-topo

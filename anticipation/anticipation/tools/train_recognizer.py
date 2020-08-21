@@ -12,8 +12,8 @@ from mmaction.apis import (get_root_logger, init_dist, set_random_seed,
 from mmaction.models import build_recognizer
 from mmcv import Config
 
-from epic.datasets import get_trimmed_dataset
-from epic.models import *
+from anticipation.datasets import get_trimmed_dataset
+from anticipation.models import *
 
 
 def parse_args():

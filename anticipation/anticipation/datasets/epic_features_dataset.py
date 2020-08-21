@@ -20,7 +20,7 @@ from mmcv.parallel import DataContainer as DC
 
 
 from .epic_utils import EpicRawFramesRecord, to_tensor
-import epic.datasets.epic_utils as epic_utils
+import anticipation.datasets.epic_utils as epic_utils
 
 
 

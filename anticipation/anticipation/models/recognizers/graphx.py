@@ -28,7 +28,7 @@ class GCN(nn.Module):
 
 
 
-from epic.models import nl
+from anticipation.models import nl
 
 @RECOGNIZERS.register_module
 class GraphX(BaseRecognizer):
