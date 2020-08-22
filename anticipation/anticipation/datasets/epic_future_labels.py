@@ -528,23 +528,154 @@ class EpicFutureLabelsGFB1(EpicFutureLabelsGFB):
         return feat
 
 
-class EpicFutureLabelsGFBLFB(EpicFutureLabelsGFB):
-    def __init__(self, **kwargs):
+class EpicFutureLabelsGFBVisit(EpicFutureLabelsGFB):
+
+    def __init__(self, node_num_member=8, rand_visit=False, **kwargs):
         super().__init__(**kwargs)
 
-    def __getitem__(self, idx):
-        data = super().__getitem__(idx)
+        self.node_num_member = node_num_member
+        self.rand_visit = rand_visit
+    
+    def get_visit_feature(self, trunk_features, start, stop, dim):
+        inds = []
+        for fid in range(start - 31, stop - 31):
+            if fid in trunk_features.keys():
+                inds.append(fid)
 
-        g = data["gfb"].data
-        node_feats = g.ndata["feats"]
-        # print(node_feats.shape)
-        lfb = data["lfb"].data
-        # print("lfb", lfb.shape)
-        node_lfb = lfb.mean(0).reshape((1, 1, -1)).expand(node_feats.shape)
+        return inds
 
-        node_feats = torch.cat([node_feats, node_lfb], dim=2)
-        g.ndata["feats"] = node_feats
-        # print(node_feats.shape)
-        data["gfb"] = DC(g, stack=False, cpu_only=True)
+    def get_node_feats(self, graph, trunk_features):
+        node_feats = []
+        node_length = []
 
-        return data
+        for node in sorted(graph.nodes()):
+            visits = graph.node[node]['members']
+
+            feats_idx = []
+            for visit in visits:
+                v_feat_idx = self.get_visit_feature(trunk_features, visit['start'][1], visit['stop'][1], self.fb_dim)
+                feats_idx.extend(v_feat_idx)
+            #         feats.append(v_feat)
+            # feats = feats or [torch.zeros(self.fb_dim)]
+
+            # # Pick last self.node_num_member visits
+            # feats = feats[-self.node_num_member:]
+            # length = len(feats)
+            # feats = feats + [torch.zeros(self.fb_dim)]*(self.node_num_member-length)
+
+            # uniformly pick self.node_num_member visits
+            if self.node_num_member > 0:
+                if self.rand_visit and len(feats_idx) > self.node_num_member:
+                    idxes = sorted(np.random.choice(feats_idx, self.node_num_member, replace=False))
+                    feats = [to_tensor(trunk_features[idx]) for idx in idxes]
+                else:
+                    if len(feats_idx) > 0:
+                        idxes_ = np.round(np.linspace(0, len(feats_idx) - 1, self.node_num_member)).astype(int)
+                        # print(idxes_, len(feats_idx))
+                        idxes = [feats_idx[i] for i in idxes_]
+                        feats = [to_tensor(trunk_features[idx]) for idx in idxes]
+                    else:
+                        feats = [torch.zeros(self.fb_dim)] * self.node_num_member
+                
+            else:
+                if len(feast_idx) > 0:
+                    feats = [to_tensor(trunk_features[idx]) for idx in feats_idx]
+                    feats = [torch.stack(feats, 0).mean(0)]
+                else:
+                    feats = [torch.zeros(self.fb_dim)]
+            
+            length = len(feats)
+
+            feats = torch.stack(feats, 0) # (K, 2048)
+            node_feats.append(feats)
+            node_length.append(length)
+            
+        node_feats = torch.stack(node_feats, 0)  # (N, K, 2048)
+        node_length = torch.LongTensor(node_length)
+
+        return node_feats, node_length
+
+
+class EpicFutureLabelsGFBAug(EpicFutureLabelsGFBVisit):
+    """
+    add graph_augmentation
+    """
+    def __init__(self, graph_aug=False, graph_drop=0.5, **kwargs):
+        super().__init__(**kwargs)
+
+        self.graph_aug = graph_aug
+        self.graph_drop = graph_drop
+    
+    def graph_augmentation(self, G, keep):
+
+        # IMPORTANT + FOR MEMORY USAGE If you use an RNN backbone!!!!
+            # node dropout
+        p = self.graph_drop
+        nodes = keep.nonzero().view(-1).tolist()
+        if len(nodes)>1:
+            node_drop = torch.rand(len(nodes))
+            node_drop = (node_drop>p).float()
+            while node_drop.sum()==len(nodes):
+                node_drop = torch.rand(len(nodes))
+                node_drop = (node_drop>p)
+            for i in node_drop.nonzero().view(-1).tolist():
+                keep[nodes[i]] = 0
+        
+        return keep
+       
+    def process_graph_feats(self, graph, trunk_features, future_labels):
+        graph = copy.deepcopy(graph)
+        # Drop useless visits (VERY IMPORTANT FOR GTEA's BLACK FRAMES !!!!!)
+        keep = torch.ones((len(graph.nodes())))
+        node_feats, node_length = self.get_node_feats(graph, trunk_features)
+        if self.dset=='gtea':
+            for i, node in enumerate(sorted(graph.nodes())):
+                visits = graph.node[node]['members']
+                if len(visits)==1 and visits[0]['stop'][1]-visits[0]['start'][1]<self.fps:
+                    # graph.remove_node(node)
+                    keep[i] = 0
+
+        if not self.test_mode and self.graph_aug:
+            keep = self.graph_augmentation(graph, keep)
+        
+        nodes = sorted(graph.nodes())
+        for i in range(keep.shape[0]):
+            if keep[i] == 0:
+                graph.remove_node(nodes[i])
+        # -------------------------------------------------------------------#
+        # Make the dgl graph now
+        nodes = sorted(graph.nodes())
+        node_to_idx = {node: idx for idx, node in enumerate(nodes)}
+        src, dst = [], []
+        if len(graph.edges()) > 0:
+            src, dst = zip(*graph.edges())
+            src = [node_to_idx[node] for node in src]
+            dst = [node_to_idx[node] for node in dst]
+
+        g = dgl.DGLGraph()
+        g.add_nodes(len(nodes))
+        g.add_edges(src, dst)
+        g.add_edges(dst, src)  # undirected
+        g.add_edges(g.nodes(), g.nodes())  # add self loops
+
+        g.ndata['feats'] = node_feats[keep == 1]
+        g.ndata['length'] = node_length[keep == 1]
+
+        if self.label=='int':
+            g.ndata['labels'] = future_labels['ints'][keep == 1]
+        elif self.label=='noun':
+            g.ndata['labels'] = future_labels['nouns'][keep == 1]
+        elif self.label == 'verb':
+            g.ndata['labels'] = future_labels['verbs'][keep == 1]
+
+        cur_status = torch.zeros(len(nodes))
+        cur_node = epic_utils.find_last_visit_node(graph)
+        cur_status[node_to_idx[cur_node]] = 1
+        g.ndata['cur_status'] = cur_status
+
+        nbhs = nx.ego_graph(graph, cur_node, radius=2, center=False).nodes()
+        for nbh in nbhs:
+            cur_status[node_to_idx[nbh]] = 2
+        g.ndata['cur_status'] = cur_status
+
+        return g
