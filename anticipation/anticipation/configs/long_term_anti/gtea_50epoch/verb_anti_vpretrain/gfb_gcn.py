@@ -8,7 +8,7 @@ task = 'anticipation'
 dset = 'gtea'
 # dset = 'gtea'
 train_many_shot = False
-gfb_loss_weight = 0.05
+gfb_loss_weight = 0.00
 
 if dset=='gtea':
     if label=='noun':

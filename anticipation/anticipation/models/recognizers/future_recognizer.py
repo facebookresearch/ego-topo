@@ -155,15 +155,6 @@ class RNNModel(I3DModel):
     def __init__(self, lstm, **kwargs):
         super().__init__(**kwargs)
 
-        # self.backbone = nn.Sequential(
-        #     nn.Linear(2048, 2048),
-        #     nn.ReLU(True),
-        #     nn.Linear(2048, 2048),
-        #     nn.ReLU(True),
-        #     nn.LSTM(
-        #         2048, 2048, num_layers=num_lstm_layer, dropout=dropout, batch_first=True,
-        #     )
-        # )
         self.rnn = builder.build_backbone(lstm)
 
     def forward_train(self, num_modalities, img_meta, gt_label, **kwargs): 
@@ -260,3 +251,50 @@ class NetVladModel(I3DModel):
         # x = x.mean(2).reshape(nB, -1)
         pred = torch.sigmoid(self.fc(x))
         return pred
+
+
+@RECOGNIZERS.register_module
+class GFBModelGCN1(GFBModel):
+    def __init__(self, gfb_module=None, pre_trans=None, **kwargs):
+        super().__init__(**kwargs)
+        print("GFBModelGCN1")
+
+        if pre_trans:
+            self.pre_trans = builder.build_backbone(pre_trans)
+        else:
+            self.pre_trans = None
+
+        if gfb_module is not None:
+            self.gcn = epic_builder.build_gfb_module(gfb_module)
+        else:
+            self.gcn = None
+
+    def get_graph_feat(self, kwargs):
+
+        losses = {}
+
+        bg = kwargs['gfb']
+        bg.to(kwargs['labels'].device)
+
+        # Average all features in each node
+        feats, lengths = bg.ndata.pop('feats'), bg.ndata.pop('length')
+        # print(feats.shape)
+        feats = feats.sum(1)/lengths.unsqueeze(1).float()
+        if self.pre_trans is not None:
+            feats = self.pre_trans(feats)
+        if self.gcn is not None:
+            feats = self.gcn(feats, bg)
+        bg.ndata['feats'] = feats
+
+        # Each node is a node level future prediction subproblem
+        if self.backbone is not None:
+            feats = self.backbone(feats)
+        node_pred = self.fc(feats)
+        node_pred = torch.sigmoid(node_pred)
+        node_labels = bg.ndata.pop('labels')
+        mask = node_labels.sum(1)>=0
+        losses['gfb_loss'] = self.gfb_loss_weight*F.binary_cross_entropy(node_pred[mask], node_labels[mask])
+
+        gfb = dgl.mean_nodes(bg, 'feats')
+
+        return gfb, losses
