@@ -18,14 +18,15 @@ import networkx as nx
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 import cv2
 import copy
+import json
 import warnings
 warnings.simplefilter("ignore", DeprecationWarning)
 
 import matplotlib
 matplotlib.use('Agg')
 
-from utils import util
-from data import epic, gtea
+from .utils import util
+from .data import epic, gtea
 from .localization_network.model import SiameseR18_5MLP, R18_5MLP
 
 parser = argparse.ArgumentParser()
@@ -67,16 +68,16 @@ class EnvGraph:
         self.args = args
 
         if args.dset=='epic':
-            self.dset = epic.EPICInteractions('data/epic', 'val', 32)
+            self.dset = epic.EPICInteractions('build_graph/data/epic', 'val', 32)
             self.dset.fps = 60
             self.start_frame = 1
             self.end_frame = self.dset.annotations['vid_lengths'][args.v_id]
         elif args.dset=='gtea':
-            self.dset = gtea.GTEAInteractions('data/gtea', 'val', 32)
+            self.dset = gtea.GTEAInteractions('build_graph/data/gtea', 'val', 32)
             self.dset.fps = 24
 
             # a lot of GTEA are blank
-            video_bounds = json.load(open('data/gtea/video_start_end.json'))
+            video_bounds = json.load(open('build_graph/data/gtea/video_start_end.json'))
             self.start_frame, self.end_frame = video_bounds[args.v_id]
 
         self.dset.transform = util.default_transform('val')
@@ -130,13 +131,6 @@ class EnvGraph:
 
         S = []
         for i in set1:
-            # try:
-            #     score = np.mean([self.pair_scores(self.frames[i], self.frames[j]) for j in set2])
-            # except:
-            #     print (set1, set2)
-            #     input()
-
-
             score = np.mean([self.pair_scores(self.frames[i], self.frames[j]) for j in set2])
             S.append(score)
         S = np.mean(S)
@@ -149,7 +143,7 @@ class EnvGraph:
         scores = []
         for node in self.G:
 
-            visits = self.G.node[node]['members']
+            visits = self.G.nodes[node]['members']
 
             # 20 uniformly sampled visits 
             visits = [visits[idx] for idx in np.round(np.linspace(0, len(visits) - 1, 20)).astype(int)]
@@ -181,7 +175,7 @@ class EnvGraph:
 
         last_node = self.state['last_node']
         if last_node is not None:
-            last_visit = G.node[last_node]['members'][-1]
+            last_visit = G.nodes[last_node]['members'][-1]
             last_frame = last_visit['stop']
         else:
             last_frame = 0
@@ -262,7 +256,7 @@ class EnvGraph:
                 self.buffer['stop'] = frame_i
             else:
                 visit = {'start':frame_i, 'stop':frame_i, 'node':node_i}
-                self.G.node[node_i]['members'].append(visit)
+                self.G.nodes[node_i]['members'].append(visit)
                 self.buffer = visit
                 self.create_new_edge(self.G, frame_i, self.state['last_node'], node_i)
 
@@ -286,7 +280,7 @@ class EnvGraph:
 
         for item in sorted(node_scores, key=lambda x: x['node']):
             prefix = '*' if best_node['node']==item['node'] else ''
-            visits = self.G.node[item['node']]['members']
+            visits = self.G.nodes[item['node']]['members']
             visits = ', '.join(['%s-->%s'%(visit['start'], visit['stop']) for visit in visits])
             vprint ('%s%s: %.3f | %s'%(prefix, item['node'], item['score'], visits))
         vprint ('-'*20)
@@ -357,7 +351,7 @@ class EnvGraph:
         node_ref = []
         for n in self.G.nodes():
 
-            last_visit = self.G.node[n]['members'][-1]
+            last_visit = self.G.nodes[n]['members'][-1]
             frame_i = (last_visit['start'] + last_visit['stop'])//2
             img = self.load_frame_viz(self.frames[frame_i])
             img = transforms.ToPILImage()(img)
@@ -393,7 +387,7 @@ class EnvGraph:
         self.G.pos = nx.spring_layout(self.G, scale=0.8, pos=self.G.pos, iterations=5)
         edges = self.G.edges()
         colors = ['black' if np.min(self.G[u][v]['dT']) < self.edge_delay else 'grey' for u, v in edges]
-        nx.draw(self.G, self.G.pos, edges=edges, edge_color=colors, node_size=10)
+        nx.draw(self.G, self.G.pos, edgelist=edges, edge_color=colors, node_size=10)
 
         for n in self.G.nodes():
             x, y = self.G.pos[n]
