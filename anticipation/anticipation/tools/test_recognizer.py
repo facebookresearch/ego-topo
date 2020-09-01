@@ -65,17 +65,6 @@ def single_test(model, data_loader):
 
 
 def do_test(cfg, checkpoint, gpus=1, proc_per_gpu=1, task='verb', logger=None):
-    if logger is None:
-        # logger = get_root_logger(cfg.log_level)
-        logging.basicConfig(
-            format='%(asctime)s - %(levelname)s - %(message)s', level=cfg.log_level)
-        logger = logging.getLogger(__name__)
-        filename = 'test.log'
-        fh = logging.FileHandler(filename=os.path.join(cfg.work_dir, filename))
-        fh.setLevel(cfg.log_level)
-        logger.addHandler(fh)
-
-
     # set cudnn_benchmark
     if cfg.get('cudnn_benchmark', False):
         torch.backends.cudnn.benchmark = True
