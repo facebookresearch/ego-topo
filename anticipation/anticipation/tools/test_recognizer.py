@@ -14,10 +14,12 @@ from mmaction.models import build_recognizer, recognizers
 from mmaction.core.evaluation.accuracy import (softmax, top_k_accuracy,
                                                mean_class_accuracy)
 from mmaction.apis.env import get_root_logger
+from mmaction.apis.train import batch_processor
 
 from .. import datasets
 from ..models import *
 import anticipation.utils as utils
+from anticipation.runner.runner import LogBuffer
 
 
 def parse_args():
@@ -32,54 +34,37 @@ def parse_args():
         default=1,
         type=int,
         help='Number of processes per GPU')
-    parser.add_argument('--out', help='output result file')
-    parser.add_argument('--use_softmax', action='store_true',
-                        help='whether to use softmax score')
     args = parser.parse_args()
     return args
 
 
 def single_test(model, data_loader):
     model.eval()
-    results = []
+    # results = []
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
+    log_buffer = LogBuffer()
     for i, data in enumerate(data_loader):
         with torch.no_grad():
-            result = model(return_loss=False, **data)
-        results.append(result)
+            outputs = batch_processor(model, data, train_mode=False)
+        
+        if 'log_vars' in outputs:
+            log_buffer.update(outputs['log_vars'], outputs['num_samples'])
 
         batch_size = data['img_group_0'].data[0].size(0) \
-            if 'img_group_0' in data else data['feature'].data[0].size(0)
+            if 'img_group_0' in data else data['lfb'].data[0].size(0)
         for _ in range(batch_size):
             prog_bar.update()
-    return results
+    log_buffer.average()
+    log_dict = {}
+    for k, v in log_buffer.output.items():
+        if 'mAP' in k:
+            log_dict[k] = v
+
+    return log_dict
 
 
-def evaluate(results, labels, task):
-    top1, top5 = top_k_accuracy(results, labels, k=(1, 5))
-    mean_acc = mean_class_accuracy(results, labels)
-
-
-    results = np.array(results)
-    labels = np.array(labels)
-    many_shot = pd.read_csv(
-        "data/epic/annotations/EPIC_many_shot_{}s.csv".format(task)
-    )['{}_class'.format(task)].values
-
-    top5_recall = utils.topk_recall(
-        results, labels, k=5, classes=many_shot)
-   # tta_score = utils.tta(results.reshape(results[0], 1, -1), labels)
-
-    # metrics = (mean_acc, top1, top5, top5_recall, tta_score)
-
-    return mean_acc, top1, top5, top5_recall
-
-
-def do_test(cfg, out, checkpoint, gpus=1, proc_per_gpu=1, use_softmax=False, task='verb', logger=None):
-    if out is not None and not out.endswith(('.pkl', '.pickle')):
-        raise ValueError('The output file must be a pkl file.')
-
+def do_test(cfg, checkpoint, gpus=1, proc_per_gpu=1, task='verb', logger=None):
     if logger is None:
         # logger = get_root_logger(cfg.log_level)
         logging.basicConfig(
@@ -114,45 +99,9 @@ def do_test(cfg, out, checkpoint, gpus=1, proc_per_gpu=1, use_softmax=False, tas
         dist=False,
         shuffle=False)
     outputs = single_test(model, data_loader)
-   
-    # support multi outputs
-    if not isinstance(outputs[0], list):
-        outputs = [[x] for x in outputs]
 
-    gt_labels = []
-    for i in range(len(dataset)):
-        ann = dataset.get_ann_info(i)
-        gt_labels.append(ann['label'])
-
-    if use_softmax:
-        logger.info("Averaging score over {} clips with softmax".format(
-            outputs[0][0].shape[0]))
-        results = [[softmax(x, dim=1).mean(axis=0) for x in res] for res in outputs]
-    else:
-        logger.info("Averaging score over {} clips without softmax (ie, raw)".format(
-            outputs[0][0].shape[0]))
-        results = [[x.mean(axis=0) for x in res] for res in outputs]
-    metrics = []
-    for i in range(len(results[0])):
-        results_i = [res[i] for res in results]
-        labels_i = [label[i] for label in gt_labels]
-
-        mean_acc, top1, top5, top5_recall = evaluate(results_i, labels_i, task)
-        logger.info("Task {} Mean Class Accuracy = {:.02f}".format(i, mean_acc * 100))
-        logger.info("Task {} Top-1 Accuracy = {:.02f}".format(i, top1 * 100))
-        logger.info("Task {} Top-5 Accuracy = {:.02f}".format(i, top5 * 100))
-        logger.info("Task {} Top-5 Recall = {:.02f}".format(i, top5_recall * 100))
-        # logger.info("Task {} tta score = {:.02f}".format(i, tta_score))
-        
-        metrics.append((mean_acc, top1, top5))
-
-    if out is not None:
-        logger.info('writing results to {}'.format(out))
-        rets = {
-            'outputs': outputs,
-            'metrics': metrics,
-        }
-        mmcv.dump(rets, out)
+    print("\n---------------")
+    print(outputs)
 
 
 def main():
@@ -162,12 +111,7 @@ def main():
         args.checkpoint = os.path.join(cfg.work_dir, "latest.pth")
     print("Testing on {}.".format(args.config))
     print("Checkpoint {}.".format(args.checkpoint))
-    output_file = None
-    if args.out is not None:
-        output_file = args.out
-    elif "output_file" in cfg:
-        output_file = cfg.output_file
-    do_test(cfg, output_file, args.checkpoint, args.gpus, args.proc_per_gpu, args.use_softmax, args.task)
+    do_test(cfg, args.checkpoint, args.gpus, args.proc_per_gpu, args.task)
 
 
 if __name__ == '__main__':
