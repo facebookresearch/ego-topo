@@ -5,6 +5,8 @@ import torchvision.transforms as transforms
 from PIL import Image
 import numpy as np
 
+from . import gtransforms
+
 
 # Apply .cuda() to every element in the batch
 def batch_cuda(batch):
@@ -25,6 +27,29 @@ def kinetics_mean_std():
     std = [57.375, 57.375, 57.375]
     return mean, std
 
+def clip_transform(split, max_len):
+
+    mean, std = kinetics_mean_std()
+    if split=='train':
+        transform = transforms.Compose([
+                        gtransforms.GroupResize(256),
+                        gtransforms.GroupRandomCrop(224),
+                        gtransforms.GroupRandomHorizontalFlip(),
+                        gtransforms.ToTensor(),
+                        gtransforms.GroupNormalize(mean, std),
+                        gtransforms.LoopPad(max_len),
+                    ])
+
+    elif split=='val':
+        transform = transforms.Compose([
+                        gtransforms.GroupResize(256),
+                        gtransforms.GroupCenterCrop(256),
+                        gtransforms.ToTensor(),
+                        gtransforms.GroupNormalize(mean, std),
+                        gtransforms.LoopPad(max_len),
+            ])
+
+    return transform
 
 def unnormalize(tensor, mode='default'):
     mean, std = kinetics_mean_std() if mode=='kinetics' else default_mean_std()
