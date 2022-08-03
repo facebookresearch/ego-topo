@@ -124,7 +124,7 @@ class GTEAInteractions(GTEA):
         self.data = self.train_data if self.split=='train' else self.val_data
         print (f'Train data: {len(self.train_data)} | Val data: {len(self.val_data)}')
         
-        # self.clip_transform = util.clip_transform(self.split, self.clip_len)    
+        self.clip_transform = util.clip_transform(self.split, self.clip_len)    
 
     def parse_data_for_split(self, videos):
         videos = set(videos)
